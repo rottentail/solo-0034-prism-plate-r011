@@ -24,6 +24,23 @@ func path(p geom.Path) string {
 	}
 	return b.String()
 }
+
+// rings renders already-expanded canvas-space contours (stroke output) without
+// a transform, so the SVG carries the same bounded geometry as the PNG.
+func rings(rs []geom.Contour) string {
+	var b strings.Builder
+	for _, ring := range rs {
+		for i, v := range ring {
+			verb := "L"
+			if i == 0 {
+				verb = "M"
+			}
+			fmt.Fprintf(&b, "%s%s %s", verb, number(v.X), number(v.Y))
+		}
+		b.WriteString("Z")
+	}
+	return b.String()
+}
 func color(c scene.Color) string {
 	return fmt.Sprintf("rgb(%s%%,%s%%,%s%%)", number(c.R*100), number(c.G*100), number(c.B*100))
 }
@@ -69,11 +86,34 @@ func Export(c scene.Compiled) []byte {
 			br := s.Shape.Brush
 			fill := color(br.Color)
 			alpha := br.Color.A
+			gradient := ""
 			if br.Kind == "linear" {
-				fill = fmt.Sprintf("url(#b%d_%d)", i, j)
+				gradient = fmt.Sprintf("url(#b%d_%d)", i, j)
+				fill = gradient
 				alpha = 1
 			}
-			fmt.Fprintf(&b, `<path d="%s" fill="%s" fill-opacity="%s" fill-rule="%s" transform="matrix(%s %s %s %s %s %s)"/>`, path(s.Path), fill, number(alpha), s.Shape.FillRule, number(m[0]), number(m[1]), number(m[2]), number(m[3]), number(m[4]), number(m[5]))
+			if len(s.Path) > 0 {
+				fmt.Fprintf(&b, `<path d="%s" fill="%s" fill-opacity="%s" fill-rule="%s" transform="matrix(%s %s %s %s %s %s)"/>`, path(s.Path), fill, number(alpha), s.Shape.FillRule, number(m[0]), number(m[1]), number(m[2]), number(m[3]), number(m[4]), number(m[5]))
+			}
+			// Stroke rings are pre-transformed fill contours; a solid brush maps
+			// directly. Gradient strokes reuse the local gradient through the
+			// inverse mapping applied to each ring vertex at export time.
+			if len(s.Strokes) > 0 {
+				if br.Kind == "linear" {
+					inv := s.Inverse
+					local := make(geom.Path, len(s.Strokes))
+					for k, ring := range s.Strokes {
+						lr := make(geom.Contour, len(ring))
+						for v, pt := range ring {
+							lr[v] = inv.Apply(pt)
+						}
+						local[k] = lr
+					}
+					fmt.Fprintf(&b, `<path d="%s" fill="%s" fill-rule="nonzero" transform="matrix(%s %s %s %s %s %s)"/>`, path(local), gradient, number(m[0]), number(m[1]), number(m[2]), number(m[3]), number(m[4]), number(m[5]))
+				} else {
+					fmt.Fprintf(&b, `<path d="%s" fill="%s" fill-opacity="%s" fill-rule="nonzero"/>`, rings(s.Strokes), fill, number(alpha))
+				}
+			}
 		}
 		b.WriteString(`</g></g>`)
 	}

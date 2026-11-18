@@ -38,6 +38,15 @@ func Render(ctx context.Context, c scene.Compiled) ([]byte, error) {
 							if s.Path.Contains(q, s.Shape.FillRule) {
 								src = paint.Over(src, paint.Sample(s.Shape.Brush, q), "normal")
 							}
+							// Stroke rings already live in canvas space; sample the
+							// brush back in shape-local coordinates so gradient
+							// semantics match fills across every transform.
+							for _, ring := range s.Strokes {
+								if ring.Contains(p) {
+									src = paint.Over(src, paint.Sample(s.Shape.Brush, q), "normal")
+									break
+								}
+							}
 						}
 						dst = paint.Over(dst, src.Scale(l.Layer.Opacity), l.Layer.Blend)
 					}

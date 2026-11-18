@@ -5,6 +5,7 @@ ROOT=pathlib.Path(__file__).resolve().parents[1]
 def main():
     parser=argparse.ArgumentParser();parser.add_argument('--workflow',required=True);args=parser.parse_args()
     seed=json.loads((ROOT/'examples/amber-proof.json').read_text())
+    stroke_seed=json.loads((ROOT/'examples/stroke-proof.json').read_text())
     with tempfile.TemporaryDirectory(prefix='prism-plate-') as tmp:
         base=pathlib.Path(tmp);binary=base/'prismplate';subprocess.run(['go','build','-o',str(binary),'./cmd/prismplate'],cwd=ROOT,check=True)
         sock=socket.socket();sock.bind(('127.0.0.1',0));port=sock.getsockname()[1];sock.close();url=f'http://127.0.0.1:{port}'
@@ -31,7 +32,7 @@ def main():
             except urllib.error.HTTPError as e:code=e.code;payload=e.read();hs={k.lower():v for k,v in e.headers.items()}
             if code!=status:raise RuntimeError(f'{method} {path}: expected {status}, observed {code}: {payload[:200]!r}')
             return (payload,hs) if raw else json.loads(payload) if payload else None
-        def render(fmt='png',revision=1):return call('POST',f'/v1/plates/amber-plate/render?revision={revision}&format={fmt}',status=201)
+        def render(fmt='png',revision=1,plate='amber-plate'):return call('POST',f'/v1/plates/{plate}/render?revision={revision}&format={fmt}',status=201)
         try:
             start();created=call('POST','/v1/plates',seed,status=201);assert created['revisions'][0]['number']==1
             w=args.workflow
@@ -84,6 +85,73 @@ def main():
             elif w=='rejection':
                 bad=copy.deepcopy(seed);bad['id']='oversize';bad['document']['width']=513;call('POST','/v1/plates',bad,status=400);call('GET','/v1/plates/oversize',status=404)
                 bad=copy.deepcopy(seed);bad['id']='invalid-brush';bad['document']['layers'][0]['shapes'][0]['brush']['stops'][1]['at']=0;call('POST','/v1/plates',bad,status=400);assert render()['revision']==1
+            elif w=='stroke':
+                # Open-path strokes travel the same build/PNG/SVG pipeline as fills,
+                # including bundle round-trip and the full admission contract.
+                created=call('POST','/v1/plates',stroke_seed,status=201)
+                assert created['revisions'][0]['number']==1
+                png=render('png',plate='stroke-plate');svg=render('svg',plate='stroke-plate')
+                png_raw,_=call('GET','/v1/artifacts/'+png['id'],raw=True)
+                svg_raw,_=call('GET','/v1/artifacts/'+svg['id'],raw=True)
+                assert png_raw[:8]==b'\x89PNG\r\n\x1a\n'
+                assert struct.unpack('>II',png_raw[16:24])==(256,192)
+                assert b'<svg' in svg_raw and b'stroke=' not in svg_raw and b'<script' not in svg_raw
+                # Re-render must be byte-identical (stable digest).
+                assert render('png',plate='stroke-plate')['digest']==png['digest']
+                assert render('svg',plate='stroke-plate')['digest']==svg['digest']
+                # Width is interpreted in canvas units: identity, mirror and a
+                # non-uniform scale all keep an identical mid-span thickness.
+                def stroke_doc(plate_id,tr,width=10):
+                    return {'id':plate_id,'title':'宽度不变量','document':{'width':120,'height':80,
+                        'background':{'r':0,'g':0,'b':0,'a':1},'layers':[{'id':'L','opacity':1,'blend':'normal','shapes':[
+                        {'id':'s','open':True,'fill_rule':'nonzero',
+                         'path':[{'kind':'M','points':[{'x':10,'y':40}]},{'kind':'L','points':[{'x':110,'y':40}]}],
+                         'transform':tr,'brush':{'kind':'solid','color':{'r':1,'g':1,'b':1,'a':1}},
+                         'stroke':{'width':width,'cap':'butt'}}]}]}}
+                def alpha_column(pid,x=60):
+                    a=call('POST',f'/v1/plates/{pid}/render?revision=1&format=png',status=201)
+                    raw=call('GET','/v1/artifacts/'+a['id'],raw=True)[0]
+                    pos=8;idat=b'';ch=3
+                    while pos<len(raw):
+                        ln=struct.unpack('>I',raw[pos:pos+4])[0];typ=raw[pos+4:pos+8];body=raw[pos+8:pos+8+ln]
+                        if typ==b'IHDR': ch={0:1,2:3,3:1,4:2,6:4}[body[9]]
+                        if typ==b'IDAT': idat+=body
+                        pos+=12+ln
+                    dec=__import__('zlib').decompress(idat);stride=120*ch;prev=bytearray(stride);heights=[]
+                    for y in range(80):
+                        f=dec[y*(stride+1)];line=bytearray(dec[y*(stride+1)+1:y*(stride+1)+1+stride])
+                        for i in range(stride):
+                            aa=line[i-ch] if i>=ch else 0;up=prev[i];cc=prev[i-ch] if i>=ch else 0
+                            if f==1:line[i]=(line[i]+aa)&255
+                            elif f==2:line[i]=(line[i]+up)&255
+                            elif f==3:line[i]=(line[i]+((aa+up)//2))&255
+                            elif f==4:
+                                p=aa+up-cc;pa=abs(p-aa);pb=abs(p-up);pc=abs(p-cc)
+                                pr=aa if(pa<=pb and pa<=pc)else(up if pb<=pc else cc);line[i]=(line[i]+pr)&255
+                        if sum(line[x*ch:x*ch+ch][:3])>60:heights.append(y)
+                        prev=line
+                    return max(heights)-min(heights)+1
+                call('POST','/v1/plates',stroke_doc('stroke-normal',[1,0,0,1,0,0]),status=201)
+                call('POST','/v1/plates',stroke_doc('stroke-mirror',[-1,0,0,1,120,0]),status=201)
+                call('POST','/v1/plates',stroke_doc('stroke-squash',[2,0,0,0.15,0,34]),status=201)
+                spans={pid:alpha_column(pid) for pid in ('stroke-normal','stroke-mirror','stroke-squash')}
+                assert len(set(spans.values()))==1 and next(iter(spans.values()))==10, spans
+                # Admission rejections for every malformed pen and contour case.
+                bad=copy.deepcopy(stroke_seed);bad['id']='bad-stroke-width'
+                bad['document']['layers'][0]['shapes'][0]['stroke']={'width':0}
+                call('POST','/v1/plates',bad,status=400)
+                bad=copy.deepcopy(stroke_seed);bad['id']='bad-stroke-dash'
+                bad['document']['layers'][0]['shapes'][0]['stroke']={'width':4,'dash':[5]}
+                call('POST','/v1/plates',bad,status=400)
+                bad=copy.deepcopy(stroke_seed);bad['id']='bad-open-no-pen'
+                del bad['document']['layers'][0]['shapes'][0]['stroke']
+                call('POST','/v1/plates',bad,status=400)
+                # Bundle export/import preserves the stroke scene and its render.
+                sealed,_=call('GET','/v1/plates/stroke-plate/bundle',raw=True)
+                stop();os.rename(base/'state',base/'original');start()
+                imported=call('POST','/v1/bundles',sealed,status=201)
+                assert imported['revisions'][0]['digest']==created['revisions'][0]['digest']
+                assert render('png',plate='stroke-plate')['digest']==png['digest']
             else:raise RuntimeError('unknown workflow '+w)
             print(json.dumps({'workflow':w,'result':'passed','entry':'HTTP','port':port},ensure_ascii=False))
         finally:stop();log.close()

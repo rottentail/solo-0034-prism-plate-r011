@@ -1,0 +1,105 @@
+{
+  "id": "stroke-plate",
+  "title": "开放路径描边边界校样",
+  "document": {
+    "width": 256,
+    "height": 192,
+    "background": { "r": 0.05, "g": 0.06, "b": 0.09, "a": 1 },
+    "layers": [
+      {
+        "id": "stroke-sheet",
+        "opacity": 1,
+        "blend": "normal",
+        "shapes": [
+          {
+            "id": "butt-round-square-caps",
+            "open": true,
+            "fill_rule": "nonzero",
+            "path": [
+              { "kind": "M", "points": [{ "x": 16, "y": 28 }] },
+              { "kind": "L", "points": [{ "x": 112, "y": 28 }] }
+            ],
+            "transform": [1, 0, 0, 1, 0, 0],
+            "brush": { "kind": "solid", "color": { "r": 0.95, "g": 0.8, "b": 0.3, "a": 1 } },
+            "stroke": { "width": 8, "cap": "square", "join": "miter", "miter_limit": 4 }
+          },
+          {
+            "id": "round-cap-line",
+            "open": true,
+            "fill_rule": "nonzero",
+            "path": [
+              { "kind": "M", "points": [{ "x": 140, "y": 28 }] },
+              { "kind": "L", "points": [{ "x": 236, "y": 28 }] }
+            ],
+            "transform": [1, 0, 0, 1, 0, 0],
+            "brush": { "kind": "solid", "color": { "r": 0.4, "g": 0.85, "b": 0.95, "a": 1 } },
+            "stroke": { "width": 8, "cap": "round" }
+          },
+          {
+            "id": "dashed-across-curve",
+            "open": true,
+            "fill_rule": "nonzero",
+            "path": [
+              { "kind": "M", "points": [{ "x": 16, "y": 72 }] },
+              { "kind": "Q", "points": [{ "x": 80, "y": 40 }, { "x": 144, "y": 72 }] },
+              { "kind": "C", "points": [{ "x": 180, "y": 90 }, { "x": 200, "y": 60 }, { "x": 240, "y": 72 }] }
+            ],
+            "transform": [1, 0, 0, 1, 0, 0],
+            "brush": { "kind": "solid", "color": { "r": 0.95, "g": 0.45, "b": 0.55, "a": 1 } },
+            "stroke": { "width": 5, "cap": "butt", "join": "round", "dash": [10, 6], "dash_offset": 2 }
+          },
+          {
+            "id": "sharp-miter-capped",
+            "open": true,
+            "fill_rule": "nonzero",
+            "path": [
+              { "kind": "M", "points": [{ "x": 20, "y": 120 }] },
+              { "kind": "L", "points": [{ "x": 70, "y": 124 }] },
+              { "kind": "L", "points": [{ "x": 120, "y": 120 }] }
+            ],
+            "transform": [1, 0, 0, 1, 0, 0],
+            "brush": { "kind": "solid", "color": { "r": 0.6, "g": 0.95, "b": 0.5, "a": 1 } },
+            "stroke": { "width": 6, "cap": "round", "join": "miter", "miter_limit": 2 }
+          },
+          {
+            "id": "mirrored-stroke",
+            "open": true,
+            "fill_rule": "nonzero",
+            "path": [
+              { "kind": "M", "points": [{ "x": 140, "y": 118 }] },
+              { "kind": "L", "points": [{ "x": 220, "y": 118 }] },
+              { "kind": "L", "points": [{ "x": 220, "y": 150 }] }
+            ],
+            "transform": [-1, 0, 0, 1, 240, 0],
+            "brush": { "kind": "solid", "color": { "r": 0.75, "g": 0.6, "b": 0.98, "a": 1 } },
+            "stroke": { "width": 6, "cap": "butt", "join": "bevel" }
+          },
+          {
+            "id": "nonuniform-scaled-stroke",
+            "open": true,
+            "fill_rule": "nonzero",
+            "path": [
+              { "kind": "M", "points": [{ "x": 20, "y": 160 }] },
+              { "kind": "L", "points": [{ "x": 110, "y": 160 }] }
+            ],
+            "transform": [1.6, 0, 0, 0.6, 0, 40],
+            "brush": { "kind": "solid", "color": { "r": 1, "g": 0.75, "b": 0.35, "a": 1 } },
+            "stroke": { "width": 6, "cap": "round" }
+          },
+          {
+            "id": "dashed-mirrored",
+            "open": true,
+            "fill_rule": "nonzero",
+            "path": [
+              { "kind": "M", "points": [{ "x": 150, "y": 168 }] },
+              { "kind": "L", "points": [{ "x": 236, "y": 168 }] }
+            ],
+            "transform": [-1, 0, 0, 1, 386, 0],
+            "brush": { "kind": "solid", "color": { "r": 0.45, "g": 0.8, "b": 0.9, "a": 1 } },
+            "stroke": { "width": 4, "cap": "square", "join": "round", "dash": [8, 5] }
+          }
+        ]
+      }
+    ]
+  }
+}

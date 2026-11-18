@@ -20,12 +20,26 @@ type Brush struct {
 	To    geom.Point `json:"to"`
 	Stops []Stop     `json:"stops,omitempty"`
 }
+
+// Stroke describes an open-path pen. Width is interpreted in canvas units
+// regardless of the shape transform, so mirroring and non-uniform scaling never
+// distort the agreed stroke width.
+type Stroke struct {
+	Width      float64   `json:"width"`
+	Cap        string    `json:"cap,omitempty"`
+	Join       string    `json:"join,omitempty"`
+	MiterLimit float64   `json:"miter_limit,omitempty"`
+	Dash       []float64 `json:"dash,omitempty"`
+	DashOffset float64   `json:"dash_offset,omitempty"`
+}
 type Shape struct {
 	ID        string      `json:"id"`
+	Open      bool        `json:"open,omitempty"`
 	Path      []geom.Op   `json:"path"`
 	FillRule  string      `json:"fill_rule"`
 	Brush     Brush       `json:"brush"`
 	Transform geom.Matrix `json:"transform"`
+	Stroke    *Stroke     `json:"stroke,omitempty"`
 }
 type Layer struct {
 	ID      string    `json:"id"`
@@ -44,6 +58,8 @@ type Document struct {
 type CompiledShape struct {
 	Shape   Shape
 	Path    geom.Path
+	Open    geom.Path
+	Strokes geom.Path
 	Inverse geom.Matrix
 }
 type CompiledLayer struct {
@@ -53,7 +69,8 @@ type CompiledLayer struct {
 	Shapes []CompiledShape
 }
 type Compiled struct {
-	Document Document
-	Layers   []CompiledLayer
-	Segments int
+	Document       Document
+	Layers         []CompiledLayer
+	Segments       int
+	StrokeVertices int
 }

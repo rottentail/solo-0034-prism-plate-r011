@@ -29,21 +29,28 @@ type Op struct {
 type Contour []Point
 type Path []Contour
 
-// Flatten uses a fixed subdivision contract shared by raster and SVG export.
-func Flatten(ops []Op) Path {
-	var out Path
+// flatten expands the fixed-subdivision curve vocabulary. Closed contours are
+// returned as rings; an open contour (no closing Z) is returned as a polyline
+// whose last point differs from its first.
+func flatten(ops []Op) (Path, Path) {
+	var closed Path
+	var open Path
 	var ring Contour
 	var at Point
-	flush := func() {
-		if len(ring) >= 3 {
-			out = append(out, ring)
+	flush := func(closedRing bool) {
+		if closedRing {
+			if len(ring) >= 3 {
+				closed = append(closed, ring)
+			}
+		} else if len(ring) >= 2 {
+			open = append(open, ring)
 		}
 		ring = nil
 	}
 	for _, o := range ops {
 		switch o.Kind {
 		case "M":
-			flush()
+			flush(false)
 			at = o.Points[0]
 			ring = append(ring, at)
 		case "L":
@@ -68,12 +75,25 @@ func Flatten(ops []Op) Path {
 			}
 			at = end
 		case "Z":
-			flush()
+			flush(true)
 		}
 	}
-	flush()
-	return out
+	flush(false)
+	return closed, open
 }
+
+// Flatten uses a fixed subdivision contract shared by raster and SVG export.
+// Only closed contours are retained; open polylines are a stroke concern.
+func Flatten(ops []Op) Path {
+	closed, _ := flatten(ops)
+	return closed
+}
+
+// FlattenOpen returns closed rings and open polylines separately.
+func FlattenOpen(ops []Op) (Path, Path) {
+	return flatten(ops)
+}
+
 func (path Path) Contains(p Point, rule string) bool {
 	winding := 0
 	crossings := 0
@@ -95,6 +115,25 @@ func (path Path) Contains(p Point, rule string) bool {
 	}
 	if rule == "evenodd" {
 		return crossings%2 == 1
+	}
+	return winding != 0
+}
+
+// Contains reports point-in-ring using the nonzero rule on a single closed ring.
+func (ring Contour) Contains(p Point) bool {
+	winding := 0
+	for i, a := range ring {
+		b := ring[(i+1)%len(ring)]
+		if (a.Y <= p.Y && b.Y > p.Y) || (b.Y <= p.Y && a.Y > p.Y) {
+			x := a.X + (p.Y-a.Y)*(b.X-a.X)/(b.Y-a.Y)
+			if x > p.X {
+				if b.Y > a.Y {
+					winding++
+				} else {
+					winding--
+				}
+			}
+		}
 	}
 	return winding != 0
 }

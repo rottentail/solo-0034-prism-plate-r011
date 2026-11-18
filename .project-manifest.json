@@ -173,6 +173,29 @@
       "verification": "python3 scripts/walkthrough.py --workflow svg"
     },
     {
+      "id": "stroke",
+      "name": "开放路径描边",
+      "entry": "POST /v1/plates → render?format=png|svg",
+      "module_ids": [
+        "transport",
+        "service",
+        "validate",
+        "geom",
+        "stroke",
+        "raster",
+        "vector",
+        "bundle",
+        "repository"
+      ],
+      "steps": [
+        "开放轮廓准入并按画布单位展开端帽、转角与虚线",
+        "同一展开几何经PNG与SVG成像并随封包移交"
+      ],
+      "success": "镜像及非等比缩放下宽度不变，虚线跨接点连续，尖角不越界",
+      "failure": "非法笔或无笔开放轮廓400",
+      "verification": "python3 scripts/walkthrough.py --workflow stroke"
+    },
+    {
       "id": "exposure",
       "name": "有界异步成像",
       "entry": "POST /v1/plates/{id}/exposures",
